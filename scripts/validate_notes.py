@@ -12,6 +12,8 @@ NOTE_TYPES_PATH = Path(__file__).resolve().parents[1] / "knowledge-types.md"
 RELATION_TYPES_PATH = Path(__file__).resolve().parents[1] / "relation-types.md"
 TAG_PATTERN = re.compile(r"#[^\s#]+")
 RELATION_PATTERN = re.compile(r"- ([^：]+)：\[\[([^\]]+)\]\]")
+FOOTNOTE_REF_PATTERN = re.compile(r"\[\^([^\]]+)\]")
+FOOTNOTE_DEF_PATTERN = re.compile(r"^\[\^([^\]]+)\]:\s+(.+)$", re.MULTILINE)
 
 
 def load_types(path: Path) -> set[str]:
@@ -34,25 +36,44 @@ def validate_note(
     prefix = str(path)
     lines = text.splitlines()
 
-    if not lines or not re.fullmatch(r"# .+", lines[0].strip()):
-        errors.append(f"{prefix}: 第一行必须是非空一级标题“# 标题”。")
+    if not lines or not any(line.strip() for line in lines):
+        errors.append(f"{prefix}: 笔记不能为空。")
 
-    tag_lines = [line.strip() for line in lines[1:] if TAG_PATTERN.fullmatch(line.strip())]
+    if any(re.fullmatch(r"# .+", line.strip()) for line in lines):
+        errors.append(f"{prefix}: 文件名就是标题，正文不要重复添加一级标题。")
+
+    tag_lines = [line.strip() for line in lines if TAG_PATTERN.fullmatch(line.strip())]
     if len(tag_lines) != 1:
         errors.append(f"{prefix}: 必须且只能包含一行独立的知识类型标签，例如“#概念”。")
     elif tag_lines[0][1:] not in knowledge_types:
         errors.append(f"{prefix}: 使用了未批准的知识类型标签：{tag_lines[0]}")
 
-    if not re.search(r"^\*\*知识\*\*\s+.+$", text, re.MULTILINE):
-        errors.append(f"{prefix}: 缺少非空的“**知识** …”行。")
-    if not re.search(r"^\*\*出处\*\*\s+.+$", text, re.MULTILINE):
-        errors.append(f"{prefix}: 缺少非空的“**出处** …”行。")
+    if lines and (not lines[0].strip() or not TAG_PATTERN.fullmatch(lines[0].strip())):
+        errors.append(f"{prefix}: 正文第一行必须是知识类型标签，例如“#概念”。")
+
+    definitions = FOOTNOTE_DEF_PATTERN.findall(text)
+    body = FOOTNOTE_DEF_PATTERN.sub("", text)
+    references = FOOTNOTE_REF_PATTERN.findall(body)
+    definition_ids = [footnote_id for footnote_id, _ in definitions]
+    if not references:
+        errors.append(f"{prefix}: 知识正文缺少脚注引用，例如“[^1]”。")
+    if not definitions:
+        errors.append(f"{prefix}: 缺少脚注出处定义，例如“[^1]: 出处”。")
+    if len(definition_ids) != len(set(definition_ids)):
+        errors.append(f"{prefix}: 脚注定义编号不能重复。")
+    if set(references) - set(definition_ids):
+        errors.append(f"{prefix}: 存在没有出处定义的脚注引用。")
+    if set(definition_ids) - set(references):
+        errors.append(f"{prefix}: 存在未引用的脚注出处定义。")
 
     in_relations = False
     for index, line in enumerate(lines, start=1):
         stripped = line.strip()
         if re.fullmatch(r"#{1,6} .+", stripped):
             in_relations = stripped == "## 关系"
+            continue
+        if FOOTNOTE_DEF_PATTERN.fullmatch(stripped):
+            in_relations = False
             continue
 
         has_link_marker = "[[" in line or "]]" in line
