@@ -21,16 +21,18 @@ disable-model-invocation: true
 5. 如理解所选章节确实需要上下文，可按需查阅其他章节。只把所选章节的知识写入笔记；跨章节引用须注明实际出处。
 6. 为每条独立知识创建一篇 Markdown 笔记。按 `knowledge-types.md` 选择且只使用一种知识类型；只在文本支持时建立关系，并按 `relation-types.md` 的固定词表记录来源到目标的关系。
 7. 如果知识无法归入现有类型，先将它们集中列为“待分类”，并向用户询问。不要临时造标签、改写标签定义或把多个标签塞进同一笔记。用户确认后再继续；用户决定新增类型或修改边界时，先更新 `knowledge-types.md`，再生成笔记。
-8. 将所有节点笔记直接保存在 EPUB 同一目录。为每篇笔记生成唯一文件名并让双链指向对应文件；传入本次生成的全部笔记路径运行 `scripts/validate_notes.py`。修复所有校验错误后交付笔记。
+8. 将所有节点笔记直接保存在 EPUB 同一目录。为每篇笔记生成唯一文件名并让双链指向对应文件；使用本文件所在目录下的 `scripts/validate_notes.py`，传入本次生成的全部笔记路径。修复所有校验错误后交付笔记。
 
 ## EPUB 提取
 
 使用仓库内的标准库脚本，不依赖第三方 Python 包：
 
 ```bash
-python3 scripts/extract_epub.py "/path/to/book.epub" --toc
-python3 scripts/extract_epub.py "/path/to/book.epub" --chapter 2
+python3 "<skill-dir>/scripts/extract_epub.py" "/path/to/book.epub" --toc
+python3 "<skill-dir>/scripts/extract_epub.py" "/path/to/book.epub" --chapter 2
 ```
+
+`<skill-dir>` 是本 `SKILL.md` 所在目录。
 
 `--toc` 返回 EPUB 目录、编号和层级；`--chapter` 接受目录编号，可重复指定。提取结果包含正文、章节标题、文件名与锚点等来源线索。若 EPUB 加密、损坏或所选目录项无法提取，说明具体问题并停止，不要猜测正文。
 
