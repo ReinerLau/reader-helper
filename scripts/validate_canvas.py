@@ -75,11 +75,23 @@ def validate(data: Any, knowledge_types: set[str] | None = None) -> list[str]:
             if not isinstance(text, str):
                 errors.append(f"{prefix}.text 必须是字符串。")
             else:
-                tags = re.findall(r"^\*\*类型\*\*\s+(.+?)\s*$", text, re.MULTILINE)
-                if len(tags) != 1:
-                    errors.append(f"{prefix}.text 必须且只能包含一行“**类型** …”。")
-                elif tags[0] not in knowledge_types:
-                    errors.append(f"{prefix} 使用了未批准的知识类型：{tags[0]}")
+                lines = text.splitlines()
+                # Skip the first line, which is the Markdown title. Knowledge tags
+                # are standalone hashtags on subsequent lines, such as #概念.
+                tag_lines = [
+                    line.strip()
+                    for line in lines[1:]
+                    if re.fullmatch(r"#[^\s#]+", line.strip())
+                ]
+                legacy_type_lines = re.findall(
+                    r"^\*\*类型\*\*\s+.+?\s*$", text, re.MULTILINE
+                )
+                if legacy_type_lines:
+                    errors.append(f"{prefix}.text 使用旧的“**类型** …”格式；请改用独立的 #类型 标签行。")
+                if len(tag_lines) != 1:
+                    errors.append(f"{prefix}.text 必须且只能包含一行独立的知识类型标签，例如“#概念”。")
+                elif tag_lines[0][1:] not in knowledge_types:
+                    errors.append(f"{prefix} 使用了未批准的知识类型标签：{tag_lines[0]}")
                 if not re.search(r"^\*\*出处\*\*\s+.+$", text, re.MULTILINE):
                     errors.append(f"{prefix}.text 缺少出处。")
 
