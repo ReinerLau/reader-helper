@@ -1,0 +1,58 @@
+name: Branch flow and merge tags
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source-policy:
+    name: PR source policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce the branch flow
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          if [[ "$BASE_BRANCH" == "main" && "$HEAD_BRANCH" != "dev" ]]; then
+            echo "Pull requests into main must come from dev."
+            exit 1
+          fi
+
+          if [[ "$BASE_BRANCH" == "dev" && "$HEAD_BRANCH" != worktree/* ]]; then
+            echo "Pull requests into dev must come from a worktree/<name> branch."
+            exit 1
+          fi
+
+  tag-merge:
+    name: Tag merged branch update
+    if: github.event_name == 'push' && github.event.after != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the merged commit
+        uses: actions/checkout@v4
+
+      - name: Create and push a tag
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          SHORT_SHA="${COMMIT_SHA:0:12}"
+          TAG="${BRANCH_NAME}-${TIMESTAMP}-${SHORT_SHA}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$COMMIT_SHA" -m "Tag $BRANCH_NAME update at $COMMIT_SHA"
+          git push origin "$TAG"
