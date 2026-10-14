@@ -1,1 +1,0 @@
-../../../relation-types.md

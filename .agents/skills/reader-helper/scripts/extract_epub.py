@@ -1,1 +1,0 @@
-../../../../scripts/extract_epub.py
